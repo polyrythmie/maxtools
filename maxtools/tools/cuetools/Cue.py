@@ -3,6 +3,7 @@ from abjad.tools.abctools import AbjadObject
 from operator import attrgetter
 from abjad.tools import systemtools
 from abjad.tools import durationtools
+from abjad.tools import markuptools
 
 # Make a fancy notehead for cues!
 class Cue(AbjadObject):
@@ -61,6 +62,11 @@ class Cue(AbjadObject):
     @property
     def cue_items_by_start_offset(self):
         return self._cue_items_by_start_offset
+
+    @property
+    def markup(self):
+        markup = markuptools.Markup(self.number)
+        return markup
 
     @property
     def number(self):

@@ -2,6 +2,7 @@
 from abjad.tools.abctools.AbjadObject import AbjadObject
 from abjad.tools import systemtools
 from maxtools.tools.cuetools import Cue
+from maxtools.tools.cuetools import CueVoiceSpanner
 
 class MaxPatcher(AbjadObject):
     r'''A max patcher specification.
@@ -40,7 +41,8 @@ class MaxPatcher(AbjadObject):
         import collections
         from abjad.tools import scoretools
         from consort.tools import SegmentMaker
-        if len(args) == 1 and isinstance(args[0], SegmentMaker):
+        if len(args) == 1:
+            # Needs to check if this is actually a segment maker without importing the whole library.
             segment_maker = args[0]
             score = segment_maker._score
             segment_metadata = segment_maker._segment_metadata
@@ -70,8 +72,6 @@ class MaxPatcher(AbjadObject):
             self._populate_cues(previous_segment_metadata)
             self._attach_cues_to_context(context)
             return self._cue_file
-
-
 
     def __format__(self, format_specification=''):
         from abjad.tools import systemtools
@@ -129,6 +129,7 @@ class MaxPatcher(AbjadObject):
                     measures.append(measure)
         print(measures)
         cue_voice.extend(measures)
+        attach(CueVoiceSpanner(), cue_voice[:])
 
     def _get_meters_as_timespans(self):
         # Should work? Copied from Consort SegmentMaker so as not to require the library.
