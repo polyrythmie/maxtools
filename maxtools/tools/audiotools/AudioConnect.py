@@ -1,13 +1,7 @@
 # -*- coding: utf-8 -*-
-from maxtools.tools.cuefiletools import CueItem
-
-# TODO:
-### Separate classes for AudioSpanner (which makes audio connection/disconnection items)
-### And AudioConnection/AudioDisconnection (which are cue items)
+from maxtools.tools.cuetools import CueItem
 
 class AudioConnect(CueItem):
-    r'''An Audio connect cue item.
-    '''
 
     ### CLASS VARIABLES ###
 
@@ -25,38 +19,27 @@ class AudioConnect(CueItem):
         inlet,
         outlet,
         gain,
-        ramp=None,
+        ramp=0,
         automatic=False,
-        time_offset=None,
-        start_offset=None,
         ):
         CueItem.__init__(
             self,
-            route='audio',
             command='connect',
-            time_offset=time_offset,
-            start_offset=start_offset,
             automatic=automatic,
             )
         self._inlet = inlet
         self._outlet = outlet
         assert 0 <= gain <= 1
         self._gain = gain
-        self._ramp = ramp or 0
+        assert 0 <= ramp
+        self._ramp = ramp
 
-    ### SPECIAL METHODS ###
+    ### PRIVATE PROPERTIES ###
 
-    ### PRIVATE METHODS ###
-
-    def _get_cue_item_format(self, cue_time_offset=0):
-        result = [super(AudioConnect, self)._get_cue_item_format(cue_time_offset=cue_time_offset)]
-        result.append('{} {} {} {}'.format(
-            self.inlet,
-            self.outlet,
-            self.gain,
-            self.ramp
-            ))
-        return ' '.join(result)
+    @property
+    def _arguments(self):
+        arguments = [self.inlet, self.outlet, str(self.gain), str(self.ramp)]
+        return arguments
 
     ### PUBLIC PROPERTIES ###
 
