@@ -12,7 +12,7 @@ def main():
         install_requires=install_requires,
         name='maxtools',
         packages=('maxtools',),
-        version='0.1',
+        version='0.2',
         zip_safe=False,
         )
 
