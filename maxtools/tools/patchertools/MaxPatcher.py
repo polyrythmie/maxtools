@@ -85,16 +85,12 @@ class MaxPatcher(AbjadObject):
         import itertools
         cue_voice = self._get_cue_voice(context)
         timespans = self._get_meters_as_timespans()
-        iterator = itertools.groupby(timespans, lambda x: x.annotation.implied_time_signature)
         measures = []
-        for time_signature, group in iterator:
+        for time_signature, group in itertools.groupby(timespans, lambda x: x.annotation.implied_time_signature):
             containers = []
             for timespan in group:
                 timespan_start_offset, timespan_stop_offset = timespan.offsets
-                cues_in_timespan = []
-                for cue in self._cues:
-                    if timespan_start_offset <= cue.start_offset < timespan_stop_offset:
-                        cues_in_timespan.append(cue)
+                cues_in_timespan = [cue for cue in self._cues if timespan_start_offset <= cue.start_offset < timespan_stop_offset]
                 if not cues_in_timespan:
                     containers.append([])
                 else:
@@ -116,18 +112,14 @@ class MaxPatcher(AbjadObject):
                         attach(cue, note)
                         contents.append(note)
                     containers.append(contents)
-            subiterator = itertools.groupby(containers, lambda x: x)
-            for container, subgroup in subiterator:
+            for container, subgroup in itertools.groupby(containers, lambda x: x):
                 if not container:
                     skip = scoretools.Skip(1)
                     multiplier = durationtools.Multiplier(time_signature) * len(tuple(subgroup))
                     attach(multiplier, skip)
-                    measure = scoretools.Container([skip])
-                    measures.append(measure)
-                else:
-                    measure = scoretools.Container(container)
-                    measures.append(measure)
-        print(measures)
+                    container = [skip]
+                measure = scoretools.Container(container)
+                measures.append(measure)
         cue_voice.extend(measures)
         attach(CueVoiceSpanner(), cue_voice[:])
 
