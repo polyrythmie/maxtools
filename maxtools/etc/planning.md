@@ -14,3 +14,7 @@
 ## Package
 - [ ] Place the Max Patcher template project in this Package to be shared
 - [ ] (Place Max Patcher template project in its own vc and include it as a submodule?)
+
+## Documentation
+- [ ] Research documentation types (maybe prefer Abjad's)
+- [ ] Implement main documentation
