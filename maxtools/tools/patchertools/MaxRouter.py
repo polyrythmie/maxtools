@@ -2,7 +2,7 @@
 from abjad import inspect_
 from abjad import iterate
 from abjad.tools.abctools.AbjadObject import AbjadObject
-from maxtools.tools.cuetools import CueItem
+from maxtools.tools.cuetools import CueCommand
 
 class MaxRouter(AbjadObject):
 
@@ -25,35 +25,24 @@ class MaxRouter(AbjadObject):
             accepts_commands = (accepts_commands,)
         self._accepts_commands = accepts_commands
 
-    ### SPECIAL METHODS ###
+    ### PRIVATE METHODS ###
 
-    def __call__(
+    def _collect_cue_commands_by_start_offset(
         self,
         context,
         ):
-        cue_items_by_start_offset = {}
-        start_offsets_in_milliseconds = {}
+        cue_commands_by_start_offset = {}
         prototype = self.accepts_commands
-        print(prototype)
         for leaf in iterate(context).by_timeline():
-            cue_items = [indicator for indicator in inspect_(leaf).get_indicators(prototype=CueItem, unwrap=True) if isinstance(indicator, prototype)]
-            if not cue_items:
+            accepted_commands = [indicator for indicator in inspect_(leaf).get_indicators(prototype=prototype, unwrap=True)]
+            if not accepted_commands:
                 continue
             start_offset = inspect_(leaf).get_timespan().start_offset
-            start_offset_in_milliseconds = int(inspect_(leaf).get_timespan(in_seconds=True).start_offset * 1000)
-            if start_offset in cue_items_by_start_offset:
-                cue_items_by_start_offset[start_offset].extend(cue_items)
-            else:
-                cue_items_by_start_offset[start_offset] = cue_items
-            if not start_offset in start_offsets_in_milliseconds:
-                start_offsets_in_milliseconds[start_offset] = start_offset_in_milliseconds
-        return cue_items_by_start_offset, start_offsets_in_milliseconds
-
-    ### PRIVATE METHODS ###
-
-    ### PRIVATE PROPERTIES ###
-
-    ### PUBLIC METHODS ###
+            cue_commands = [CueCommand(route=self.route, command=_.command, arguments=_.arguments, automatic=_.automatic) for _ in accepted_commands]
+            if start_offset not in cue_commands_by_start_offset:
+                cue_commands_by_start_offset[start_offset] = []
+            cue_commands_by_start_offset[start_offset].extend(cue_commands)
+        return cue_commands_by_start_offset
 
     ### PUBLIC PROPERTIES ###
 

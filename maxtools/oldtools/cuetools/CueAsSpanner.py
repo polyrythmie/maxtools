@@ -22,7 +22,7 @@ class CueAsSpanner(Spanner):
     def __init__(self, number, reminder=False, overrides=None):
         assert isinstance(number, int), repr(number)
         self._number = number
-        self._reminder = bool(reminder)
+        self._reminder = reminder
         Spanner.__init__(self, overrides=overrides)
 
     ### SPECIAL METHODS ###
@@ -35,9 +35,20 @@ class CueAsSpanner(Spanner):
 
     ### PRIVATE PROPERTIES ###
 
+    @property
+    def _cue_file_format(self):
+        result = []
+        if self.number != 0:
+            result.append('-------- {}'.format(self.number))
+        return '\n'.join(result)
+
     ### PUBLIC METHODS ###
 
     ### PUBLIC PROPERTIES ###
+    @property
+    def markup(self):
+        markup = markuptools.Markup(self.number)
+        return markup
 
     @property
     def number(self):

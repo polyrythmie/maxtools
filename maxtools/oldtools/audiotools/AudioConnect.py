@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from maxtools.tools.patchertools.MaxSetting import MaxSetting
+from maxtools.tools.cuetools import CueItem
 
-class AudioConnect(MaxSetting):
+class AudioConnect(CueItem):
 
     ### CLASS VARIABLES ###
 
@@ -22,7 +22,7 @@ class AudioConnect(MaxSetting):
         ramp=0,
         automatic=False,
         ):
-        MaxSetting.__init__(
+        CueItem.__init__(
             self,
             command='connect',
             automatic=automatic,
@@ -34,15 +34,14 @@ class AudioConnect(MaxSetting):
         assert 0 <= ramp
         self._ramp = ramp
 
+    ### PRIVATE PROPERTIES ###
+
+    @property
+    def _arguments(self):
+        arguments = [self.inlet, self.outlet, str(self.gain), str(self.ramp)]
+        return arguments
+
     ### PUBLIC PROPERTIES ###
-
-    @property
-    def arguments(self):
-        return [self.inlet, self.outlet, self.gain, self.ramp]
-
-    @property
-    def gain(self):
-        return self._gain
 
     @property
     def inlet(self):
@@ -51,6 +50,10 @@ class AudioConnect(MaxSetting):
     @property
     def outlet(self):
         return self._outlet
+
+    @property
+    def gain(self):
+        return self._gain
 
     @property
     def ramp(self):
