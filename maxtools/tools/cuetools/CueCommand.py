@@ -34,10 +34,11 @@ class CueCommand(AbjadObject):
     ### PRIVATE PROPERTIES ###
 
     @property
-    def _cue_command(self):
+    def _cue_format(self):
         cue_command = [self.route, self.command]
         if self.arguments is not None:
-            cue_command.extend(self.arguments)
+            cue_command.extend(str(x) for x in self.arguments)
+        cue_command = ' '.join(cue_command)
         return cue_command
 
     ### PRIVATE METHODS ###

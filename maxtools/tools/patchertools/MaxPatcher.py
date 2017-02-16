@@ -1,19 +1,29 @@
 # -*- coding: utf-8 -*-
 from abjad import attach
+from abjad import inspect_
 from abjad.tools.abctools.AbjadObject import AbjadObject
 from abjad.tools import durationtools
 from abjad.tools import selectortools
 from abjad.tools import scoretools
+import collections
 import itertools
+from maxtools.tools.cuetools.Cue import Cue
+from maxtools.tools.cuetools.CueCommand import CueCommand
 
 class MaxPatcher(AbjadObject):
 
     ### CLASS VARIABLES ###
 
     __slots__ = (
+        '_context',
         '_context_name',
+        '_command_point_map',
+        '_cue_voice',
+        '_cues',
         '_file_name',
+        '_previous_segment_metadata',
         '_routers',
+        '_segment_metadata',
         )
 
     ### INITIALIZER ###
@@ -34,58 +44,128 @@ class MaxPatcher(AbjadObject):
 
     def __call__(
         self,
-        segment_maker,
+        segment_maker=None,
+        score=None,
+        segment_metadata=None,
+        meters=None,
+        meters_as_timespans=None,
+        previous_segment_metadata=None,
         ):
-        score = segment_maker._score
-        segment_metadata = segment_maker._segment_metadata
-        previous_segment_metadata = segment_maker._previous_segment_metadata
+        if segment_maker is not None:
+            score = segment_maker._score
+            self._segment_metadata = segment_maker._segment_metadata
+            self._previous_segment_metadata = segment_maker._previous_segment_metadata
+            meters_as_timespans = segment_maker.meters_to_timespans(segment_maker._meters)
+        else:
+            assert score is not None
+            self._segment_metadata = segment_metadata or collections.OrderedDict()
+            self._previous_segment_metadata = previous_segment_metadata or collections.OrderedDict()
         assert self.context_name in score
-        context = score[self.context_name]
-        cue_commands_by_start_offset = self._collect_cue_commands_by_start_offset(context)
-        meters_as_timespans = segment_maker.meters_to_timespans(segment_maker._meters)
-        cue_command_voice = self._make_cue_command_voice(meters_as_timespans, cue_commands_by_start_offset)
-        cues = self._make_cues(cue_command_voice)
-
+        self._context = score[self.context_name]
+        meters_as_timespans = meters_as_timespans or self._get_meters_as_timespans(self._context, meters=meters)
+        self._command_point_map = self._collect_command_points(self._context, self.routers)
+        self._cue_voice = self._make_cue_voice(meters_as_timespans, self._command_point_map)
+        self._insert_cue_voice()
+        self._cues = self._attach_cues(self._cue_voice, self._previous_segment_metadata)
+        self._update_segment_metadata()
+        return self._cue_file, self._segment_metadata
 
     ### PRIVATE METHODS ###
 
-    def _collect_cue_commands_by_start_offset(
+    def _collect_command_points(
         self,
         context,
+        routers,
         ):
         result = {}
-        for router in self.routers:
+        for router in routers:
             for start_offset, commands in router._collect_cue_commands_by_start_offset(context).iteritems():
                 if not start_offset in result:
                     result[start_offset] = []
                 result[start_offset].extend(commands)
         return result
 
-    def _make_cues(
+    def _add_cue_voice(
         self,
-        cue_command_voice,
         ):
-        # TODO
+        self._context.insert(0, self._cue_voice)
+
+    def _attach_cues(
+        self,
+        cue_voice,
+        previous_segment_metadata,
+        ):
+        last_cue_time_context_map = previous_segment_metadata.get('last_cue_time_context_map', {})
+        last_cue_time = last_cue_time_context_map.get(self.context_name, {})
+        if last_cue_time:
+            last_cue_number = last_cue_time[0]
+            last_cue_time_to_segment_end = last_cue_time[1]
+        else:
+            last_cue_number = 0
+            last_cue_time_to_segment_end = 0
         make_cue_at = []
-        for index, measure in enumerate(cue_file):
+        for index, measure in enumerate(cue_voice):
             for subindex, leaf in enumerate(measure):
                 if not all([x.automatic for x in inspect_(leaf).get_indicators(prototype=CueCommand)]):
                     make_cue_at.append([index, subindex])
         if not make_cue_at:
             return
-        current_cue_number = 1
+        current_cue_number = last_cue_number + 1
         cues = []
+        last_indices = [0, 0]
+        selector = selectortools.Selector().by_leaf().flatten()
+        selection = selector(cue_voice)._music
         for index, indices in enumerate(make_cue_at):
-            if index > 0:
-                cues[-1]
-            attach(Cue(number=current_cue_number), cue_command_voice[indices[0]][indices[1]])
+            if index is 0 and indices != [0, 0]:
+                reminder_cue = Cue(number=last_cue_number, reminder=True)
+                cues.append(reminder_cue)
+            if cues:
+                attach(cues[-1], selection[selection.index(cue_voice[last_indices[0]][last_indices[1]]):selection.index(cue_voice[indices[0]][indices[1]])])
+            new_cue = Cue(number=current_cue_number)
+            cues.append(new_cue)
             current_cue_number += 1
+            last_indices = indices
+            if index == len(make_cue_at) - 1:
+                attach(cues[-1], selection[selection.index(cue_voice[last_indices[0]][last_indices[1]]):])
+        return cues
 
+    @staticmethod
+    def _get_meters_as_timespans(context, meters=None):
+        # Copied from consort.tools.SegmentMaker so as not to require the library
+        # if the user is not using it.
+        from abjad.tools import metertools, mathtools, timespantools
+        if meters is None:
+            meters = []
+            selector = selectortools.Selector().by_class(prototype=scoretools.Voice).flatten()
+            selection = max(selector(context))
+            selector = selectortools.Selector().by_leaf().by_logical_measure()
+            selection = selector(selection)
+            for select in selection:
+                meters.append(metertools.Meter(select.get_duration()))
+        durations = [_.duration for _ in meters]
+        offsets = mathtools.cumulative_sums(durations)
+        offsets = [durationtools.Offset(_) for _ in offsets]
+        timespans = []
+        for i, meter in enumerate(meters):
+            start_offset = offsets[i]
+            stop_offset = offsets[i + 1]
+            timespan = timespantools.AnnotatedTimespan(
+                annotation=meter,
+                start_offset=start_offset,
+                stop_offset=stop_offset,
+                )
+            timespans.append(timespan)
+        return timespans
 
-    def _make_cue_command_voice(
+    def _insert_cue_voice(
+        self,
+        ):
+        self._context.insert(0, self._cue_voice)
+
+    def _make_cue_voice(
         self,
         timespans,
-        cue_commands_by_start_offset,
+        command_point_map,
         ):
         def make_skip_from(start_offset, stop_offset):
             duration = stop_offset - start_offset
@@ -110,7 +190,7 @@ class MaxPatcher(AbjadObject):
             containers = []
             for timespan in group:
                 timespan_start_offset, timespan_stop_offset = timespan.offsets
-                offsets_in_timespan = sorted([start_offset for start_offset in cue_commands_by_start_offset if timespan_start_offset <= start_offset < timespan_stop_offset])
+                offsets_in_timespan = sorted([start_offset for start_offset in command_point_map if timespan_start_offset <= start_offset < timespan_stop_offset])
                 if not offsets_in_timespan:
                     containers.append([])
                 else:
@@ -123,7 +203,7 @@ class MaxPatcher(AbjadObject):
                             note = make_note_from(offset, timespan_stop_offset)
                         else:
                             note = make_note_from(offset, offsets_in_timespan[index + 1])
-                        for cue_command in cue_commands_by_start_offset[offset]:
+                        for cue_command in command_point_map[offset]:
                             attach(cue_command, note)
                         contents.append(note)
                     containers.append(contents)
@@ -135,8 +215,26 @@ class MaxPatcher(AbjadObject):
                     container = [skip]
                 measure = scoretools.Measure(time_signature=time_signature, music=container)
                 measures.append(measure)
-        cue_command_voice = scoretools.Voice(measures)
-        return cue_command_voice
+        cue_voice = scoretools.Voice(measures)
+        return cue_voice
+
+    def _update_segment_metadata(self):
+        if not self._segment_metadata.get('last_cue_time_context_map', {}):
+            self._segment_metadata.update(
+                last_cue_time_context_map=collections.OrderedDict()
+                )
+        last_cue_time_context_map = self._segment_metadata.get('last_cue_time_context_map', {})
+        last_cue_time_context_map.update({self.context_name:[self._cues[-1].number, self._cues[-1]._duration_in_ms]})
+
+    ### PRIVATE PROPERTIES ###
+
+    @property
+    def _cue_file(self):
+        result = []
+        for cue in self._cues:
+            result.append(cue._cue_file_format)
+        result = '\n'.join(result)
+        return result
 
     ### PUBLIC PROPERTIES ###
 
