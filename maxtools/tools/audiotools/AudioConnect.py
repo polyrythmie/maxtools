@@ -41,7 +41,7 @@ class AudioConnect(MaxSetting):
             if self.inlet == setting.inlet and self.outlet == setting.outlet:
                 if self.gain != setting.gain:
                     return True
-        return not super(AudioConnect, self).__eq__(setting)
+        return False
 
     ### PUBLIC PROPERTIES ###
 
