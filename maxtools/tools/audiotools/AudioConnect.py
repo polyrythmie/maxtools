@@ -34,6 +34,15 @@ class AudioConnect(MaxSetting):
         assert 0 <= ramp
         self._ramp = ramp
 
+    ### PRIVATE PROPERTIES ###
+
+    def _overrides_setting(self, setting):
+        if isinstance(setting, type(self)):
+            if self.inlet == setting.inlet and self.outlet == setting.outlet:
+                if self.gain != setting.gain:
+                    return True
+        return not super(AudioConnect, self).__eq__(setting)
+
     ### PUBLIC PROPERTIES ###
 
     @property

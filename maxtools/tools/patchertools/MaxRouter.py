@@ -27,11 +27,11 @@ class MaxRouter(AbjadObject):
 
     ### PRIVATE METHODS ###
 
-    def _collect_cue_commands_by_start_offset(
+    def _collect_command_points(
         self,
         context,
         ):
-        cue_commands_by_start_offset = {}
+        command_point_map = {}
         prototype = self.accepts_commands
         for leaf in iterate(context).by_timeline():
             accepted_commands = [indicator for indicator in inspect_(leaf).get_indicators(prototype=prototype, unwrap=True)]
@@ -39,10 +39,10 @@ class MaxRouter(AbjadObject):
                 continue
             start_offset = inspect_(leaf).get_timespan().start_offset
             cue_commands = [CueCommand(route=self.route, command=_.command, arguments=_.arguments, automatic=_.automatic) for _ in accepted_commands]
-            if start_offset not in cue_commands_by_start_offset:
-                cue_commands_by_start_offset[start_offset] = []
-            cue_commands_by_start_offset[start_offset].extend(cue_commands)
-        return cue_commands_by_start_offset
+            if start_offset not in command_point_map:
+                command_point_map[start_offset] = []
+            command_point_map[start_offset].extend(cue_commands)
+        return command_point_map
 
     ### PUBLIC PROPERTIES ###
 

@@ -79,7 +79,7 @@ class MaxPatcher(AbjadObject):
         ):
         result = {}
         for router in routers:
-            for start_offset, commands in router._collect_cue_commands_by_start_offset(context).iteritems():
+            for start_offset, commands in router._collect_command_points(context).iteritems():
                 if not start_offset in result:
                     result[start_offset] = []
                 result[start_offset].extend(commands)

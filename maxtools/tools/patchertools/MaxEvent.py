@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 from abjad.tools.abctools import AbjadObject
 
-class MaxSetting(AbjadObject):
-    '''A max setting.
+class MaxEvent(AbjadObject):
+    '''A max event.
     '''
 
     __slots__ = (
@@ -22,28 +22,11 @@ class MaxSetting(AbjadObject):
 
     ### SPECIAL METHODS ###
 
-    def __eq__(
-        self,
-        setting,
-        ):
-        return (
-            isinstance(setting, type(self)) and
-            self.command == setting.command and
-            self.arguments == setting.arguments and
-            self.automatic == setting.automatic
-            )
-
     ### PRIVATE PROPERTIES ###
-
-    def _overrides_setting(self, setting):
-        return False
 
     ### PRIVATE METHODS ###
 
     ### PUBLIC METHODS ###
-
-    def overrides_setting(self, setting):
-        return self._overrides_setting
 
     ### PUBLIC PROPERTIES ###
 
