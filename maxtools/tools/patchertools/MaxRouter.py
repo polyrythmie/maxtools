@@ -13,6 +13,7 @@ class MaxRouter(AbjadObject):
     __slots__ = (
         '_accepts_commands',
         '_initialization',
+        '_last_effective_settings',
         '_route',
         )
 
@@ -21,21 +22,26 @@ class MaxRouter(AbjadObject):
     def __init__(
         self,
         route,
-        accepts_commands = None,
+        accepts_commands=None,
+        initialization=[]
         ):
         self._route = route
         if not isinstance(accepts_commands, (list, tuple)):
             accepts_commands = (accepts_commands,)
         self._accepts_commands = accepts_commands
+        if not isinstance(initialization, (list, tuple)):
+            initialization = (initialization,)
+        for init_command in initialization:
+            assert isinstance(init_command, accepts_commands)
+        self._initialization = initialization
 
     ### PRIVATE METHODS ###
 
     def _collect_command_points(
         self,
         context,
-        initialization=[],
+        persisting_settings=set(),
         ):
-        self._initialization = initialization
         command_point_map = {}
         prototype = self.accepts_commands
         for leaf in iterate(context).by_timeline():
@@ -46,7 +52,7 @@ class MaxRouter(AbjadObject):
             if start_offset not in command_point_map:
                 command_point_map[start_offset] = set()
             command_point_map[start_offset] |= accepted_commands
-        command_point_map = self.remove_redundant_settings(command_point_map, initialization=initialization)
+        command_point_map, self._last_effective_settings = self.remove_redundant_settings(command_point_map, persisting_settings=persisting_settings)
         command_point_map = self._postprocess_commands(command_point_map)
         return command_point_map
 
@@ -69,16 +75,16 @@ class MaxRouter(AbjadObject):
     @staticmethod
     def remove_redundant_settings(
         command_point_map,
-        initialization=[],
+        persisting_settings=set(),
         ):
-        # Could probably make this faster
-        persisting_settings = set(initialization)
+        if not isinstance(persisting_settings, set):
+            persisting_settings = set(persisting_settings)
         for start_offset in sorted(command_point_map):
             commands = command_point_map[start_offset]
             new_settings = set([x for x in commands if (isinstance(x, MaxSetting) and not any([x.equivalent_to_setting(y) for y in persisting_settings]))])
             command_point_map[start_offset] = new_settings | set([x for x in commands if (isinstance(x, MaxEvent))])
             persisting_settings = set([x for x in persisting_settings if not any([y.overrides_setting(x) for y in new_settings])]) | new_settings
-        return command_point_map
+        return command_point_map, persisting_settings
 
     ### PUBLIC PROPERTIES ###
 
