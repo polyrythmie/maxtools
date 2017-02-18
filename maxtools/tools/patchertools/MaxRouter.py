@@ -35,16 +35,14 @@ class MaxRouter(AbjadObject):
         command_point_map = {}
         prototype = self.accepts_commands
         for leaf in iterate(context).by_timeline():
-            accepted_commands = [indicator for indicator in inspect_(leaf).get_indicators(prototype=prototype, unwrap=True)]
+            accepted_commands = set([indicator for indicator in inspect_(leaf).get_indicators(prototype=prototype, unwrap=True)])
             if not accepted_commands:
                 continue
             start_offset = inspect_(leaf).get_timespan().start_offset
             if start_offset not in command_point_map:
-                command_point_map[start_offset] = []
-            command_point_map[start_offset].extend(accepted_commands)
+                command_point_map[start_offset] = set()
+            command_point_map[start_offset] |= accepted_commands
         print("Command point map:")
-        for start_offset in sorted(command_point_map):
-            print("\t{}: {}".format(start_offset, command_point_map[start_offset]))
         command_point_map = self.remove_redundant_settings(command_point_map)
         command_point_map = self.postprocess_commands(command_point_map)
         return command_point_map
@@ -54,14 +52,16 @@ class MaxRouter(AbjadObject):
     @staticmethod
     def remove_redundant_settings(command_point_map):
         # This will break events
-        persisting_settings = []
+        persisting_settings = set()
         for start_offset in sorted(command_point_map):
             commands = command_point_map[start_offset]
-            new_settings = [x for x in commands if (isinstance(x, MaxSetting) and not any([x == y for y in persisting_settings]))]
+            settings = set([x for x in commands if isinstance(x, MaxSetting)])
+            new_settings = settings - persisting_settings
+            #events = [x for x in commands if (isinstance(x, MaxEvent))]
             print("New settings: {}".format(new_settings))
             if new_settings:
-                persisting_settings = [x for x in persisting_settings if not any([y.overrides_setting(x) for y in new_settings])]
-                persisting_settings.extend(new_settings)
+                persisting_settings = set([x for x in persisting_settings if not any([y.overrides_setting(x) for y in new_settings])])
+                persisting_settings.update(new_settings)
                 print("Persisting_settings: {}".format(persisting_settings))
             command_point_map[start_offset] = new_settings
         return command_point_map

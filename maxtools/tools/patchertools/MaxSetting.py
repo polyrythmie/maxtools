@@ -33,6 +33,13 @@ class MaxSetting(AbjadObject):
             self.automatic == setting.automatic
             )
 
+    def __hash__(
+        self,
+        ):
+        from abjad.tools import systemtools
+        hash_values = systemtools.StorageFormatAgent(self).get_hash_values()
+        return hash(hash_values)
+
     ### PRIVATE PROPERTIES ###
 
     def _overrides_setting(self, setting):
