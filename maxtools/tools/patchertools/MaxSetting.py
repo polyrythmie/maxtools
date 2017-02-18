@@ -29,8 +29,7 @@ class MaxSetting(AbjadObject):
         return (
             isinstance(setting, type(self)) and
             self.command == setting.command and
-            self.arguments == setting.arguments and
-            self.automatic == setting.automatic
+            self.arguments == setting.arguments
             )
 
     def __hash__(
@@ -42,6 +41,9 @@ class MaxSetting(AbjadObject):
 
     ### PRIVATE PROPERTIES ###
 
+    def _equivalent_to_setting(self, setting):
+        return self == setting
+
     def _overrides_setting(self, setting):
         return False
 
@@ -49,8 +51,11 @@ class MaxSetting(AbjadObject):
 
     ### PUBLIC METHODS ###
 
+    def equivalent_to_setting(self, setting):
+        return self._equivalent_to_setting(setting)
+
     def overrides_setting(self, setting):
-        return self._overrides_setting
+        return self._overrides_setting(setting)
 
     ### PUBLIC PROPERTIES ###
 

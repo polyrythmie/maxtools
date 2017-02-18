@@ -43,9 +43,7 @@ class Cue(Spanner):
     @property
     def _cue_file_format(self):
         start_offset_in_ms = int(self._get_timespan(in_seconds=True).start_offset * 1000)
-        result = []
-        if self.number != 0:
-            result.append('---------- {}'.format(self.number))
+        result = ['---------- {}'.format(self.number)]
         for time, commands in self._cue_command_time_map.iteritems():
             time_offset = time - start_offset_in_ms
             result.extend(['{} {}'.format(time_offset, command._cue_format) for command in commands])

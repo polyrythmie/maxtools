@@ -21,6 +21,7 @@ class MaxPatcher(AbjadObject):
         '_cue_voice',
         '_cues',
         '_file_name',
+        '_initialization',
         '_previous_segment_metadata',
         '_routers',
         '_segment_metadata',
@@ -33,12 +34,16 @@ class MaxPatcher(AbjadObject):
         file_name,
         context_name,
         routers,
+        initialization=None,
         ):
         self._file_name = file_name
         self._context_name = context_name
         if not isinstance(routers, (list, tuple)):
             routers = (routers,)
         self._routers = routers
+        if not isinstance(initialization, (list, tuple)):
+            initialization = (initialization,)
+        self._initialization = initialization
 
     ### SPECIAL METHODS ###
 
@@ -63,46 +68,42 @@ class MaxPatcher(AbjadObject):
         assert self.context_name in score
         self._context = score[self.context_name]
         meters_as_timespans = meters_as_timespans or self._get_meters_as_timespans(self._context, meters=meters)
-        self._command_point_map = self._collect_command_points(self._context, self.routers)
+
+        last_cue_time_context_map = self._previous_segment_metadata.get('last_cue_time_context_map', {})
+        last_cue_time = last_cue_time_context_map.get(self.context_name, [0, 0])
+        last_cue_number = last_cue_time[0]
+        last_cue_time_to_segment_end = last_cue_time[1]
+
+        initialization = self.initialization if last_cue_number == 0 else []
+        self._command_point_map = self._collect_command_points(self._context, self.routers, initialization=initialization)
         self._cue_voice = self._make_cue_voice(meters_as_timespans, self._command_point_map)
         self._insert_cue_voice()
-        self._cues = self._attach_cues(self._cue_voice, self._previous_segment_metadata)
+        self._cues = self._attach_cues(self._cue_voice, last_cue_number, last_cue_time_to_segment_end)
         self._update_segment_metadata()
         return self._cue_file, self._segment_metadata
 
     ### PRIVATE METHODS ###
 
+    @staticmethod
     def _collect_command_points(
-        self,
         context,
         routers,
+        initialization=[],
         ):
         result = {}
         for router in routers:
-            for start_offset, commands in router._collect_command_points(context).iteritems():
+            for start_offset, commands in router._collect_command_points(context, initialization=initialization).iteritems():
                 if not start_offset in result:
                     result[start_offset] = []
                 result[start_offset].extend(commands)
         return result
 
-    def _add_cue_voice(
-        self,
-        ):
-        self._context.insert(0, self._cue_voice)
-
+    @staticmethod
     def _attach_cues(
-        self,
         cue_voice,
-        previous_segment_metadata,
+        last_cue_number=0,
+        last_cue_time_to_segment_end=0,
         ):
-        last_cue_time_context_map = previous_segment_metadata.get('last_cue_time_context_map', {})
-        last_cue_time = last_cue_time_context_map.get(self.context_name, {})
-        if last_cue_time:
-            last_cue_number = last_cue_time[0]
-            last_cue_time_to_segment_end = last_cue_time[1]
-        else:
-            last_cue_number = 0
-            last_cue_time_to_segment_end = 0
         make_cue_at = []
         for index, measure in enumerate(cue_voice):
             for subindex, leaf in enumerate(measure):
@@ -116,7 +117,7 @@ class MaxPatcher(AbjadObject):
         selector = selectortools.Selector().by_leaf().flatten()
         selection = selector(cue_voice)._music
         for index, indices in enumerate(make_cue_at):
-            if index is 0 and indices != [0, 0]:
+            if index is 0 and indices != [0, 0] and last_cue_number != 0:
                 reminder_cue = Cue(number=last_cue_number, reminder=True)
                 cues.append(reminder_cue)
             if cues:
@@ -162,8 +163,8 @@ class MaxPatcher(AbjadObject):
         ):
         self._context.insert(0, self._cue_voice)
 
+    @staticmethod
     def _make_cue_voice(
-        self,
         timespans,
         command_point_map,
         ):
@@ -231,6 +232,12 @@ class MaxPatcher(AbjadObject):
     @property
     def _cue_file(self):
         result = []
+        if self._cues[0].number == 1:
+            init_commands = set()
+            for router in self._routers:
+                init_commands |= router._get_initialization_commands()
+            for init_command in init_commands:
+                result.append('0 {}'.format(init_command._cue_format))
         for cue in self._cues:
             result.append(cue._cue_file_format)
         result = '\n'.join(result)
@@ -245,6 +252,10 @@ class MaxPatcher(AbjadObject):
     @property
     def file_name(self):
         return self._file_name
+
+    @property
+    def initialization(self):
+        return self._initialization
 
     @property
     def routers(self):

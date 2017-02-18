@@ -36,12 +36,21 @@ class AudioConnect(MaxSetting):
 
     ### PRIVATE PROPERTIES ###
 
+    def _equivalent_to_setting(self, setting):
+        return (
+            isinstance(setting, type(self)) and
+            self.inlet == setting.inlet and
+            self.outlet == setting.outlet and
+            self.gain == setting.gain
+            )
+
     def _overrides_setting(self, setting):
-        if isinstance(setting, type(self)):
-            if self.inlet == setting.inlet and self.outlet == setting.outlet:
-                if self.gain != setting.gain:
-                    return True
-        return False
+        return (
+            isinstance(setting, type(self)) and
+            self.inlet == setting.inlet and
+            self.outlet == setting.outlet and
+            self.gain != setting.gain
+            )
 
     ### PUBLIC PROPERTIES ###
 

@@ -3,6 +3,7 @@ from abjad import inspect_
 from abjad import iterate
 from abjad.tools.abctools.AbjadObject import AbjadObject
 from maxtools.tools.cuetools import CueCommand
+from maxtools.tools.patchertools.MaxEvent import MaxEvent
 from maxtools.tools.patchertools.MaxSetting import MaxSetting
 
 class MaxRouter(AbjadObject):
@@ -11,6 +12,7 @@ class MaxRouter(AbjadObject):
 
     __slots__ = (
         '_accepts_commands',
+        '_initialization',
         '_route',
         )
 
@@ -31,7 +33,9 @@ class MaxRouter(AbjadObject):
     def _collect_command_points(
         self,
         context,
+        initialization=[],
         ):
+        self._initialization = initialization
         command_point_map = {}
         prototype = self.accepts_commands
         for leaf in iterate(context).by_timeline():
@@ -42,34 +46,38 @@ class MaxRouter(AbjadObject):
             if start_offset not in command_point_map:
                 command_point_map[start_offset] = set()
             command_point_map[start_offset] |= accepted_commands
-        print("Command point map:")
-        command_point_map = self.remove_redundant_settings(command_point_map)
-        command_point_map = self.postprocess_commands(command_point_map)
+        command_point_map = self.remove_redundant_settings(command_point_map, initialization=initialization)
+        command_point_map = self._postprocess_commands(command_point_map)
         return command_point_map
+
+    def _postprocess_commands(
+        self,
+        command_point_map,
+        ):
+        for start_offset, commands in command_point_map.iteritems():
+            command_point_map[start_offset] = set([CueCommand(route=self.route, command=_.command, arguments=_.arguments, automatic=_.automatic) for _ in commands])
+        return command_point_map
+
+    ### PRIVATE PROPERTIES ###
+
+    def _get_initialization_commands(self):
+        cue_commands = set([CueCommand(route=self.route, command=_.command, arguments=_.arguments, automatic=_.automatic) for _ in self._initialization])
+        return cue_commands
 
     ### PUBLIC METHODS ###
 
     @staticmethod
-    def remove_redundant_settings(command_point_map):
-        # This will break events
-        persisting_settings = set()
+    def remove_redundant_settings(
+        command_point_map,
+        initialization=[],
+        ):
+        # Could probably make this faster
+        persisting_settings = set(initialization)
         for start_offset in sorted(command_point_map):
             commands = command_point_map[start_offset]
-            settings = set([x for x in commands if isinstance(x, MaxSetting)])
-            new_settings = settings - persisting_settings
-            #events = [x for x in commands if (isinstance(x, MaxEvent))]
-            print("New settings: {}".format(new_settings))
-            if new_settings:
-                persisting_settings = set([x for x in persisting_settings if not any([y.overrides_setting(x) for y in new_settings])])
-                persisting_settings.update(new_settings)
-                print("Persisting_settings: {}".format(persisting_settings))
-            command_point_map[start_offset] = new_settings
-        return command_point_map
-
-    def postprocess_commands(self, command_point_map):
-        for start_offset, commands in command_point_map.iteritems():
-            cue_commands = [CueCommand(route=self.route, command=_.command, arguments=_.arguments, automatic=_.automatic) for _ in commands]
-            command_point_map[start_offset] = cue_commands
+            new_settings = set([x for x in commands if (isinstance(x, MaxSetting) and not any([x.equivalent_to_setting(y) for y in persisting_settings]))])
+            command_point_map[start_offset] = new_settings | set([x for x in commands if (isinstance(x, MaxEvent))])
+            persisting_settings = set([x for x in persisting_settings if not any([y.overrides_setting(x) for y in new_settings])]) | new_settings
         return command_point_map
 
     ### PUBLIC PROPERTIES ###
