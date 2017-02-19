@@ -65,20 +65,23 @@ class MaxPatcher(AbjadObject):
         self._context = score[self.context_name]
         meters_as_timespans = meters_as_timespans or self._get_meters_as_timespans(self._context, meters=meters)
 
-        last_cue_time_context_map = self._previous_segment_metadata.get('last_cue_time_context_map', {})
-        last_cue_time = last_cue_time_context_map.get(self.context_name, [0, 0])
-        last_cue_number = last_cue_time[0]
-        last_cue_time_to_segment_end = last_cue_time[1]
-
-        last_effective_settings_context_map = self._previous_segment_metadata.get('last_effective_settings_context_map', {})
-        last_effective_settings = last_effective_settings_context_map.get(self.context_name, set())
+        last_patcher_metadata = self._get_last_patcher_metadata()
+        last_cue_number = last_patcher_metadata['last_cue_number']
+        last_cue_duration_in_ms = last_patcher_metadata['last_cue_duration_in_ms']
+        last_effective_settings = last_patcher_metadata['last_effective_settings']
+        initialize = (last_cue_number == 0)
 
         with systemtools.Timer(
             '    total:',
             'Collecting command points:',
             verbose=True,
             ):
-            self._command_point_map = self._collect_cue_command_points(self._context, self.routers, initialize=(last_cue_number == 0), last_effective_settings=last_effective_settings)
+            self._command_point_map = self._collect_cue_command_points(
+                self._context,
+                self.routers,
+                initialize=initialize,
+                last_effective_settings=last_effective_settings
+                )
         with systemtools.Timer(
             '    total:',
             'Creating Cue Voice:',
@@ -93,8 +96,13 @@ class MaxPatcher(AbjadObject):
             'Attaching Cues:',
             verbose=True,
             ):
-            self._cues = self._attach_cues(self._cue_voice, last_cue_number, last_cue_time_to_segment_end)
-        #TODO: self._update_segment_metadata()
+            self._cues = self._attach_cues(
+                self._cue_voice,
+                last_cue_number,
+                last_cue_duration_in_ms)
+
+        self._update_segment_metadata()
+
         return self._cue_file, self._segment_metadata
 
     ### PRIVATE METHODS ###
@@ -119,7 +127,7 @@ class MaxPatcher(AbjadObject):
     def _attach_cues(
         cue_voice,
         last_cue_number=0,
-        last_cue_time_to_segment_end=0,
+        last_cue_duration_in_ms=0,
         ):
         make_cue_at = []
         for index, measure in enumerate(cue_voice):
@@ -135,7 +143,7 @@ class MaxPatcher(AbjadObject):
         selection = selector(cue_voice)._music
         for index, indices in enumerate(make_cue_at):
             if index is 0 and indices != [0, 0] and last_cue_number != 0:
-                reminder_cue = Cue(number=last_cue_number, reminder=True)
+                reminder_cue = Cue(number=last_cue_number, reminder=True, time_offset=last_cue_duration_in_ms)
                 cues.append(reminder_cue)
             if cues:
                 attach(cues[-1], selection[selection.index(cue_voice[last_indices[0]][last_indices[1]]):selection.index(cue_voice[indices[0]][indices[1]])])
@@ -175,9 +183,7 @@ class MaxPatcher(AbjadObject):
             timespans.append(timespan)
         return timespans
 
-    def _insert_cue_voice(
-        self,
-        ):
+    def _insert_cue_voice(self):
         cue_staff_name = '{} Cue Staff'.format(self.file_name)
         if not cue_staff_name in self._context:
             self._context.insert(0, scoretools.Staff(name=cue_staff_name, context_name='CueStaff'))
@@ -246,28 +252,40 @@ class MaxPatcher(AbjadObject):
         cue_voice = scoretools.Voice(measures)
         return cue_voice
 
-    def _update_segment_metadata(self):
-        if not self._segment_metadata.get('last_cue_time_context_map', {}):
-            self._segment_metadata.update(
-                last_cue_time_context_map=collections.OrderedDict()
+    def _get_last_patcher_metadata(self):
+        last_patcher_metadata = self._previous_segment_metadata.get(
+            'patcher_metadata',
+            collections.OrderedDict(),
+            ).get(
+                self.file_name,
+                {
+                    'last_cue_number': 0,
+                    'last_cue_duration_in_ms': 0,
+                    'last_effective_settings': set()
+                    }
                 )
-        last_cue_time_context_map = self._segment_metadata.get('last_cue_time_context_map')
+        return last_patcher_metadata
+
+    def _update_segment_metadata(self):
+        if not self._segment_metadata.get('patcher_metadata', {}):
+            self._segment_metadata.update(patcher_metadata=collections.OrderedDict())
+        patcher_metadata = self._segment_metadata.get('patcher_metadata')
         if self._cues:
             last_cue_number = self._cues[-1].number
-            last_cue_time_to_segment_end = self._cues[-1]._duration_in_ms
+            last_cue_duration_in_ms = self._cues[-1]._duration_in_ms
         else:
-            last_cue_time_context_map = self._previous_segment_metadata.get('last_cue_time_context_map', {})
-            last_cue_time = last_cue_time_context_map.get(self.context_name, [0, 0])
-            last_cue_number = last_cue_time[0]
-            last_cue_time_to_segment_end = last_cue_time[1] + int(inspect_(self._cue_voice).get_duration(in_seconds=True) * 1000)
-        last_cue_time_context_map.update({self.context_name:[last_cue_number, last_cue_time_to_segment_end]})
-        if not self._segment_metadata.get('last_effective_settings_context_map', {}):
-            self._segment_metadata.update(last_effective_settings_context_map=collections.OrderedDict())
-        last_effective_settings_context_map = self._segment_metadata.get('last_effective_settings_context_map')
+            last_patcher_metadata = self._get_last_patcher_metadata()
+            last_cue_number = last_patcher_metadata['last_cue_number']
+            last_cue_duration_in_ms = last_patcher_metadata['last_cue_duration_in_ms']
         last_effective_settings = set()
         for router in self.routers:
             last_effective_settings |= router._last_effective_settings
-        last_effective_settings_context_map.update({self.context_name:last_effective_settings})
+        new_metadata = {
+            'last_cue_number': last_cue_number,
+            'last_cue_duration_in_ms': last_cue_duration_in_ms,
+            'last_effective_settings': last_effective_settings,
+            }
+        patcher_metadata.update({self._file_name: new_metadata})
 
     ### PRIVATE PROPERTIES ###
 

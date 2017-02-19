@@ -15,14 +15,16 @@ class Cue(Spanner):
     __slots__ = (
         '_number',
         '_reminder',
+        '_time_offset',
         )
 
     ### INITIALIZER ###
 
-    def __init__(self, number, reminder=False, overrides=None):
+    def __init__(self, number, reminder=False, time_offset=0, overrides=None):
         assert isinstance(number, int), repr(number)
         self._number = number
         self._reminder = bool(reminder)
+        self._time_offset = time_offset
         Spanner.__init__(self, overrides=overrides)
 
     ### SPECIAL METHODS ###
@@ -37,7 +39,7 @@ class Cue(Spanner):
 
     @property
     def _cue_command_time_map(self):
-        result = {int(inspect_(leaf).get_timespan(in_seconds=True).start_offset * 1000):inspect_(leaf).get_indicators(prototype=CueCommand) for leaf in iterate(self).by_class(scoretools.Leaf)}
+        result = {(int(inspect_(leaf).get_timespan(in_seconds=True).start_offset * 1000) + self.time_offset):inspect_(leaf).get_indicators(prototype=CueCommand) for leaf in iterate(self).by_class(scoretools.Leaf)}
         return result
 
     @property
@@ -52,7 +54,7 @@ class Cue(Spanner):
 
     @property
     def _duration_in_ms(self):
-        return int(self._get_duration(in_seconds=True) * 1000)
+        return (int(self._get_duration(in_seconds=True) * 1000) + self.time_offset)
 
     ### PUBLIC METHODS ###
 
@@ -65,3 +67,7 @@ class Cue(Spanner):
     @property
     def reminder(self):
         return self._reminder
+
+    @property
+    def time_offset(self):
+        return self._time_offset
