@@ -34,6 +34,21 @@ class AudioConnect(MaxSetting):
         assert 0 <= ramp
         self._ramp = ramp
 
+    ### SPECIAL METHODS ###
+
+    def __format__(self, format_specification=''):
+        from abjad.tools import systemtools
+        agent = systemtools.StorageFormatAgent(self)
+        names = list(agent.signature_keyword_names)
+        #values = [list(self._collection.items())]
+        return systemtools.FormatSpecification(
+            self,
+            repr_is_indented=False,
+            #storage_format_args_values=values,
+            storage_format_kwargs_names=names,
+            storage_format_includes_root_package=True,
+            )
+
     ### PRIVATE PROPERTIES ###
 
     def _equivalent_to_setting(self, setting):

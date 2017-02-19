@@ -47,13 +47,10 @@ class MaxRouter(AbjadObject):
         last_effective_settings=set(),
         ):
         self._context = context
-        self._collect_command_points()
-        for last_effective_setting in last_effective_settings:
-            if not isinstance(last_effective_setting, self.accepts_commands):
-                last_effective_settings.discard(last_effective_setting)
-        self._last_effective_settings = last_effective_settings
+        self._last_effective_settings = set([x for x in last_effective_settings if isinstance(x, self.accepts_commands)])
         if initialize:
             self._last_effective_settings |= self.initialization
+        self._collect_command_points()
         self._postprocess_command_point_map()
         self._make_cue_command_point_map()
         return self._cue_command_point_map
@@ -90,7 +87,7 @@ class MaxRouter(AbjadObject):
 
     @property
     def _initialization_cue_commands(self):
-        cue_commands = set([CueCommand(route=self.route, command=_.command, arguments=_.arguments, automatic=_.automatic) for _ in self._initialization])
+        cue_commands = set([CueCommand(route=self.route, command=_.command, arguments=_.arguments, automatic=_.automatic) for _ in self.initialization])
         return cue_commands
 
     ### PUBLIC METHODS ###

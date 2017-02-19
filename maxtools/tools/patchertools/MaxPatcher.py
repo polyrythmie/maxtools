@@ -2,6 +2,7 @@
 from abjad import attach
 from abjad import inspect_
 from abjad.tools.abctools.AbjadObject import AbjadObject
+from abjad.tools import datastructuretools
 from abjad.tools import durationtools
 from abjad.tools import selectortools
 from abjad.tools import scoretools
@@ -268,7 +269,7 @@ class MaxPatcher(AbjadObject):
 
     def _update_segment_metadata(self):
         if not self._segment_metadata.get('patcher_metadata', {}):
-            self._segment_metadata.update(patcher_metadata=collections.OrderedDict())
+            self._segment_metadata.update(patcher_metadata=datastructuretools.TypedOrderedDict())
         patcher_metadata = self._segment_metadata.get('patcher_metadata')
         if self._cues:
             last_cue_number = self._cues[-1].number
