@@ -5,6 +5,7 @@ from abjad.tools.abctools.AbjadObject import AbjadObject
 from abjad.tools import durationtools
 from abjad.tools import selectortools
 from abjad.tools import scoretools
+from abjad.tools import systemtools
 import collections
 import itertools
 from maxtools.tools.cuetools.Cue import Cue
@@ -72,29 +73,46 @@ class MaxPatcher(AbjadObject):
         last_effective_settings_context_map = self._previous_segment_metadata.get('last_effective_settings_context_map', {})
         last_effective_settings = last_effective_settings_context_map.get(self.context_name, set())
 
-        self._command_point_map = self._collect_command_points(self._context, self.routers, persisting_settings=last_effective_settings)
-        self._cue_voice = self._make_cue_voice(meters_as_timespans, self._command_point_map)
-        self._cue_voice.name = '{} Cue Voice'.format(self.file_name)
-        self._cue_voice.context_name = 'CueVoice'
-        self._insert_cue_voice()
-        self._cues = self._attach_cues(self._cue_voice, last_cue_number, last_cue_time_to_segment_end)
-        #self._update_segment_metadata()
+        with systemtools.Timer(
+            '    total:',
+            'Collecting command points:',
+            verbose=True,
+            ):
+            self._command_point_map = self._collect_cue_command_points(self._context, self.routers, initialize=(last_cue_number == 0), last_effective_settings=last_effective_settings)
+        with systemtools.Timer(
+            '    total:',
+            'Creating Cue Voice:',
+            verbose=True,
+            ):
+            self._cue_voice = self._make_cue_voice(meters_as_timespans, self._command_point_map)
+            self._cue_voice.name = '{} Cue Voice'.format(self.file_name)
+            self._cue_voice.context_name = 'CueVoice'
+            self._insert_cue_voice()
+        with systemtools.Timer(
+            '    total:',
+            'Attaching Cues:',
+            verbose=True,
+            ):
+            self._cues = self._attach_cues(self._cue_voice, last_cue_number, last_cue_time_to_segment_end)
+        #TODO: self._update_segment_metadata()
         return self._cue_file, self._segment_metadata
 
     ### PRIVATE METHODS ###
 
     @staticmethod
-    def _collect_command_points(
+    def _collect_cue_command_points(
         context,
         routers,
-        persisting_settings=set(),
+        initialize=False,
+        last_effective_settings=set(),
         ):
         result = {}
         for router in routers:
-            for start_offset, commands in router._collect_command_points(context, persisting_settings=persisting_settings).iteritems():
+            cue_command_point_map = router.__call__(context, initialize=initialize, last_effective_settings=last_effective_settings)
+            for start_offset, commands in cue_command_point_map.iteritems():
                 if not start_offset in result:
-                    result[start_offset] = []
-                result[start_offset].extend(commands)
+                    result[start_offset] = set()
+                result[start_offset] |= commands
         return result
 
     @staticmethod
@@ -188,36 +206,43 @@ class MaxPatcher(AbjadObject):
                 return note
             return None
 
-        measures = []
-        for time_signature, group in itertools.groupby(timespans, lambda x: x.annotation.implied_time_signature):
-            containers = []
-            for timespan in group:
-                timespan_start_offset, timespan_stop_offset = timespan.offsets
-                offsets_in_timespan = sorted([start_offset for start_offset in command_point_map if timespan_start_offset <= start_offset < timespan_stop_offset])
-                if not offsets_in_timespan:
-                    containers.append([])
-                else:
-                    contents = []
-                    initial_skip = make_skip_from(timespan_start_offset, offsets_in_timespan[0])
-                    if initial_skip is not None:
-                        contents.append(initial_skip)
-                    for index, offset in enumerate(offsets_in_timespan):
-                        if index == (len(offsets_in_timespan) - 1):
-                            note = make_note_from(offset, timespan_stop_offset)
-                        else:
-                            note = make_note_from(offset, offsets_in_timespan[index + 1])
-                        for cue_command in command_point_map[offset]:
-                            attach(cue_command, note)
-                        contents.append(note)
-                    containers.append(contents)
-            for container, subgroup in itertools.groupby(containers, lambda x: x):
-                if not container:
-                    skip = scoretools.Skip(1)
-                    multiplier = durationtools.Multiplier(time_signature) * len(tuple(subgroup))
-                    attach(multiplier, skip)
-                    container = [skip]
-                measure = scoretools.Measure(time_signature=time_signature, music=container)
-                measures.append(measure)
+        with systemtools.Timer(
+            '       total:',
+            '   populating measures:',
+            verbose=True,
+            ):
+            measures = []
+            for time_signature, group in itertools.groupby(timespans, lambda x: x.annotation.implied_time_signature):
+                containers = []
+                for timespan in group:
+                    timespan_start_offset, timespan_stop_offset = timespan.offsets
+                    offsets_in_timespan = sorted([start_offset for start_offset in command_point_map if timespan_start_offset <= start_offset < timespan_stop_offset])
+                    if not offsets_in_timespan:
+                        containers.append([])
+                    else:
+                        contents = []
+                        initial_skip = make_skip_from(timespan_start_offset, offsets_in_timespan[0])
+                        if initial_skip is not None:
+                            contents.append(initial_skip)
+                        for index, offset in enumerate(offsets_in_timespan):
+                            if index == (len(offsets_in_timespan) - 1):
+                                note = make_note_from(offset, timespan_stop_offset)
+                            else:
+                                note = make_note_from(offset, offsets_in_timespan[index + 1])
+                            for cue_command in command_point_map[offset]:
+                                attach(cue_command, note)
+                            contents.append(note)
+                        containers.append(contents)
+                for container, subgroup in itertools.groupby(containers, lambda x: x):
+                    if not container:
+                        skip = scoretools.Skip(1)
+                        multiplier = durationtools.Multiplier(time_signature) * len(tuple(subgroup))
+                        attach(multiplier, skip)
+                        container = scoretools.Container([skip])
+                        measures.append(container)
+                    else:
+                        measure = scoretools.Measure(time_signature=time_signature, music=container)
+                        measures.append(measure)
         cue_voice = scoretools.Voice(measures)
         return cue_voice
 
@@ -239,7 +264,6 @@ class MaxPatcher(AbjadObject):
         if not self._segment_metadata.get('last_effective_settings_context_map', {}):
             self._segment_metadata.update(last_effective_settings_context_map=collections.OrderedDict())
         last_effective_settings_context_map = self._segment_metadata.get('last_effective_settings_context_map')
-        print(last_effective_settings_context_map)
         last_effective_settings = set()
         for router in self.routers:
             last_effective_settings |= router._last_effective_settings
@@ -255,7 +279,7 @@ class MaxPatcher(AbjadObject):
         if self._cues[0].number == 1:
             init_commands = set()
             for router in self._routers:
-                init_commands |= router._get_initialization_commands()
+                init_commands |= router._initialization_cue_commands
             for init_command in init_commands:
                 result.append('0 {}'.format(init_command._cue_format))
         for cue in self._cues:
