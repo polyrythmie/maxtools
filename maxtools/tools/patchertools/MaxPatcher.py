@@ -254,6 +254,7 @@ class MaxPatcher(AbjadObject):
         return cue_voice
 
     def _get_last_patcher_metadata(self):
+        import importlib
         last_patcher_metadata = self._previous_segment_metadata.get(
             'patcher_metadata',
             collections.OrderedDict(),
@@ -262,10 +263,28 @@ class MaxPatcher(AbjadObject):
                 {
                     'last_cue_number': 0,
                     'last_cue_duration_in_ms': 0,
-                    'last_effective_settings': set()
+                    'last_effective_settings': {},
                     }
                 )
+        last_effective_settings = set()
+        for module, instances in last_patcher_metadata['last_effective_settings'].iteritems():
+            module = importlib.import_module(module)
+            instances = set([instance[0](*instance[1]) for instance in instances])
+            last_effective_settings |= instances
+        last_patcher_metadata['last_effective_settings'] = last_effective_settings
         return last_patcher_metadata
+
+    def _format_last_effective_settings_metadata(self):
+        last_effective_settings_package_map = {}
+        for router in self.routers:
+            for setting in router._last_effective_settings:
+                settings = setting.__getnewargs__()
+                module = setting.__module__
+                name = type(setting).__name__
+                if not module in last_effective_settings_package_map:
+                    last_effective_settings_package_map[module] = []
+                last_effective_settings_package_map[module].append([name, settings])
+        return last_effective_settings_package_map
 
     def _update_segment_metadata(self):
         if not self._segment_metadata.get('patcher_metadata', {}):
@@ -278,9 +297,7 @@ class MaxPatcher(AbjadObject):
             last_patcher_metadata = self._get_last_patcher_metadata()
             last_cue_number = last_patcher_metadata['last_cue_number']
             last_cue_duration_in_ms = last_patcher_metadata['last_cue_duration_in_ms']
-        last_effective_settings = set()
-        for router in self.routers:
-            last_effective_settings |= router._last_effective_settings
+        last_effective_settings = self._format_last_effective_settings_metadata()
         new_metadata = {
             'last_cue_number': last_cue_number,
             'last_cue_duration_in_ms': last_cue_duration_in_ms,

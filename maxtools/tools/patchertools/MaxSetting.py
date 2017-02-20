@@ -32,19 +32,6 @@ class MaxSetting(AbjadObject):
             self.arguments == setting.arguments
             )
 
-    def __format__(self):
-        from abjad.tools import systemtools
-        agent = systemtools.StorageFormatAgent(self)
-        names = list(agent.signature_keyword_names)
-        #values = [list(self._collection.items())]
-        return systemtools.FormatSpecification(
-            self,
-            repr_is_indented=False,
-            #storage_format_args_values=values,
-            storage_format_kwargs_names=names,
-            storage_format_includes_root_package=True,
-            )
-
     def __hash__(
         self,
         ):
@@ -56,6 +43,15 @@ class MaxSetting(AbjadObject):
 
     def _equivalent_to_setting(self, setting):
         return self == setting
+
+    def _get_format_specification(self):
+        from abjad.tools import systemtools
+        agent = systemtools.StorageFormatAgent(self)
+        names = list(agent.signature_keyword_names)
+        return systemtools.FormatSpecification(
+            client=self,
+            storage_format_kwargs_names=names,
+            )
 
     def _overrides_setting(self, setting):
         return False
