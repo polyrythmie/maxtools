@@ -73,8 +73,8 @@ class MaxPatcher(AbjadObject):
         initialize = (last_cue_number == 0)
 
         with systemtools.Timer(
-            '    total:',
-            'Collecting command points:',
+            '       total:',
+            '   Collecting command points:',
             verbose=True,
             ):
             self._command_point_map = self._collect_cue_command_points(
@@ -83,9 +83,10 @@ class MaxPatcher(AbjadObject):
                 initialize=initialize,
                 last_effective_settings=last_effective_settings
                 )
+            print(format(self._command_point_map))
         with systemtools.Timer(
-            '    total:',
-            'Creating Cue Voice:',
+            '       total:',
+            '   Creating Cue Voice:',
             verbose=True,
             ):
             self._cue_voice = self._make_cue_voice(meters_as_timespans, self._command_point_map)
@@ -93,8 +94,8 @@ class MaxPatcher(AbjadObject):
             self._cue_voice.context_name = 'CueVoice'
             self._insert_cue_voice()
         with systemtools.Timer(
-            '    total:',
-            'Attaching Cues:',
+            '       total:',
+            '   Attaching Cues:',
             verbose=True,
             ):
             self._cues = self._attach_cues(

@@ -77,11 +77,16 @@ class MaxRouter(AbjadObject):
 
 
     def _postprocess_command_point_map(self):
+        postprocessed_command_point_map = {}
         for start_offset in sorted(self._command_point_map):
             commands = self._command_point_map[start_offset]
             new_settings = set([x for x in commands if (isinstance(x, MaxSetting) and not any([x.equivalent_to_setting(y) for y in self._last_effective_settings]))])
-            self._command_point_map[start_offset] = new_settings | set([x for x in commands if (isinstance(x, MaxEvent))])
+            all_commands = new_settings | set([x for x in commands if (isinstance(x, MaxEvent))])
+            if not all_commands:
+                continue
+            postprocessed_command_point_map[start_offset] = all_commands
             self._last_effective_settings = set([x for x in self._last_effective_settings if not any([y.overrides_setting(x) for y in new_settings])]) | new_settings
+        self._command_point_map = postprocessed_command_point_map
 
     ### PRIVATE PROPERTIES ###
 

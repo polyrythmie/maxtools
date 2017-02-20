@@ -32,6 +32,9 @@ class MaxSetting(AbjadObject):
             self.arguments == setting.arguments
             )
 
+    def __getnewargs__(self):
+        return (self.command, self.automatic)
+
     def __hash__(
         self,
         ):
