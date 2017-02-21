@@ -83,7 +83,6 @@ class MaxPatcher(AbjadObject):
                 initialize=initialize,
                 last_effective_settings=last_effective_settings
                 )
-            print(format(self._command_point_map))
         with systemtools.Timer(
             '       total:',
             '   Creating Cue Voice:',
@@ -209,7 +208,7 @@ class MaxPatcher(AbjadObject):
             duration = stop_offset - start_offset
             if duration > durationtools.Duration(0):
                 multiplier, duration = duration.yield_equivalent_durations()[0]
-                note = scoretools.Note(0, duration)
+                note = scoretools.Note(11, duration)
                 attach(multiplier, note)
                 return note
             return None
