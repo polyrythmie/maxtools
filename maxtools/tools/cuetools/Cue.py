@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
+from abjad import attach
 from abjad import inspect_
 from abjad import iterate
+from abjad.tools import indicatortools
 from abjad.tools import lilypondnametools
 from abjad.tools import markuptools
 from abjad.tools import schemetools
@@ -38,12 +40,19 @@ class Cue(Spanner):
 
     ### PRIVATE METHODS ###
 
+    def _attach_timing_marker(self, lilypond_format_bundle):
+        # This will not scale by the number of staffs yet.
+        markup = markuptools.MarkupCommand('timingMarker', 1, 14)
+        markup = markuptools.Markup(markup, direction=Up)
+        lilypond_format_bundle.right.markup.append(r'- \tweak layer #-1')
+        lilypond_format_bundle.right.markup.append(markup)
+
     def _get_lilypond_format_bundle(self, leaf):
         lilypond_format_bundle = self._get_basic_lilypond_format_bundle(leaf)
         if self._is_my_first_leaf(leaf):
             self._make_cue_start_notehead_overrides(self.number, lilypond_format_bundle)
         if inspect_(leaf).has_indicator(CueCommand):
-            self._make_timing_overrides(lilypond_format_bundle)
+            self._attach_timing_marker(lilypond_format_bundle)
         return lilypond_format_bundle
 
     def _make_cue_start_notehead_overrides(self, number, lilypond_format_bundle):
@@ -67,15 +76,10 @@ class Cue(Spanner):
             grob_name='NoteHead',
             is_once=True,
             property_path='Y-offset',
-            value=-0.75,
+            value=-1,
             )
         string = override_.override_string
         lilypond_format_bundle.grob_overrides.append(string)
-
-    @staticmethod
-    def _make_timing_overrides(lilypond_format_bundle):
-        # TODO
-        pass
 
     ### PRIVATE PROPERTIES ###
 
@@ -116,12 +120,12 @@ class Cue(Spanner):
 
     @property
     def cue_markup(self):
-        markup = markuptools.Markup(self.number)
-        markup = markup.huge()
+        cue = markuptools.Markup(self.number)
+        cue = cue.huge()
         if self.reminder:
-            markup = markup.parenthesize()
-        else:
-            markup = markup.circle()
-            markup = markup.override(('circle-padding', 1))
-        markup = markup.whiteout()
-        return markup
+            cue = cue.parenthesize()
+            return cue
+        cue = cue.circle()
+        cue = cue.override(('circle-padding', 1))
+        cue = cue.whiteout()
+        return cue
