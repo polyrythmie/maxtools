@@ -323,6 +323,24 @@ class MaxPatcher(AbjadObject):
         result = '\n'.join(result)
         return result
 
+    @property
+    def _jamoma_format(self):
+        if not self._cues:
+            return None
+        result = []
+        if self._cues[0].number == 1:
+            init_commands = set()
+            for router in self._routers:
+                init_commands |= router._initialization_cue_commands
+            result.append('- cue "init"')
+            result.append('- description "Initialisation"')
+            result.extend(init_commands)
+        for cue in self._cues:
+            result.append('')
+            result.append(cue._jamoma_format)
+        result = '\n'.join(result)
+        return result
+
     ### PUBLIC PROPERTIES ###
 
     @property

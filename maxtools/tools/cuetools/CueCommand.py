@@ -41,6 +41,13 @@ class CueCommand(AbjadObject):
         cue_command = ' '.join(cue_command)
         return cue_command
 
+    @property
+    def _jamoma_format(self):
+        cue_command = ['/{}/{}'.format(self.route, self.command)]
+        cue_command.extend(self.arguments)
+        cue_command = ' '.join(cue_command)
+        return cue_command
+
     ### PRIVATE METHODS ###
 
     ### PUBLIC PROPERTIES ###

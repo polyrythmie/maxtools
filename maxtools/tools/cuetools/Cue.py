@@ -18,6 +18,8 @@ class Cue(Spanner):
     ### CLASS VARIABLES ###
 
     __slots__ = (
+        '_description',
+        '_name',
         '_number',
         '_reminder',
         '_time_offset',
@@ -25,9 +27,11 @@ class Cue(Spanner):
 
     ### INITIALIZER ###
 
-    def __init__(self, number, reminder=False, time_offset=0, overrides=None):
+    def __init__(self, number, name=None, description=None, reminder=False, time_offset=0, overrides=None):
         assert isinstance(number, int), repr(number)
         self._number = number
+        self._name = name
+        self._description = description
         self._reminder = bool(reminder)
         self._time_offset = time_offset
         Spanner.__init__(self, overrides=overrides)
@@ -98,12 +102,30 @@ class Cue(Spanner):
         return result
 
     @property
+    def _jamoma_format(self):
+        result = ['- cue "{}"'.format(self.name or self.number), '- description "{}"'.format(self.description or 'None')]
+        for time, commands in self._cue_command_time_map.iteritems():
+            time_offset = time - start_offset_in_ms
+            # TODO: Jamoma automatic items?
+            result.extend([command._jamoma_format for command in commands])
+        result = '\n'.join(result)
+        return result
+
+    @property
     def _duration_in_ms(self):
         return (int(self._get_duration(in_seconds=True) * 1000) + self.time_offset)
 
     ### PUBLIC METHODS ###
 
     ### PUBLIC PROPERTIES ###
+
+    @property
+    def description(self):
+        return self._description
+
+    @property
+    def name(self):
+        return self._name
 
     @property
     def number(self):
