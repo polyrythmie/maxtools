@@ -41,8 +41,7 @@ class Cue(Spanner):
     ### PRIVATE METHODS ###
 
     def _attach_timing_marker(self, lilypond_format_bundle):
-        # This will not scale by the number of staffs yet.
-        markup = markuptools.MarkupCommand('timingMarker', 1, 14)
+        markup = markuptools.MarkupCommand('timingMarker')
         markup = markuptools.Markup(markup, direction=Up)
         lilypond_format_bundle.right.markup.append(r'- \tweak layer #-1')
         lilypond_format_bundle.right.markup.append(markup)
